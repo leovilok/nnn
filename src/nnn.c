@@ -400,6 +400,9 @@ static char g_pipepath[TMP_LEN_MAX] __attribute__ ((aligned));
 #define STATE_FORTUNE 0x20
 #define STATE_TRASH 0x40
 #define STATE_FORCEQUIT 0x80
+#ifndef NOFIFO
+#define STATE_AUTOFIFO 0x100
+#endif
 
 static uint g_states;
 
@@ -6880,6 +6883,11 @@ static void cleanup(void)
 	free(ihashbmp);
 	free(bookmark);
 	free(plug);
+#ifndef NOFIFO
+	if (g_states | STATE_AUTOFIFO)
+		unlink(fifopath);
+#endif
+
 #ifdef DBGMODE
 	disabledbg();
 #endif
@@ -6906,8 +6914,13 @@ int main(int argc, char *argv[])
 
 	while ((opt = (env_opts_id > 0
 		       ? env_opts[--env_opts_id]
-		       : getopt(argc, argv, "Ab:cdeEfFgHKl:nop:P:QrRs:St:T:Vxh"))) != -1) {
+		       : getopt(argc, argv, "aAb:cdeEfFgHKl:nop:P:QrRs:St:T:Vxh"))) != -1) {
 		switch (opt) {
+#ifndef NOFIFO
+		case 'a':
+			g_states |= STATE_AUTOFIFO;
+			break;
+#endif
 		case 'A':
 			cfg.autoselect = 0;
 			break;
@@ -7154,6 +7167,12 @@ int main(int argc, char *argv[])
 
 #ifndef NOFIFO
 	/* Create fifo */
+	if (g_states | STATE_AUTOFIFO) {
+		g_tmpfpath[tmpfplen - 1] = '\0';
+		snprintf(g_buf, CMD_LEN_MAX, "%s/nnn-fifo.%d", g_tmpfpath, getpid());
+		setenv("NNN_FIFO", g_buf, TRUE);
+	}
+
 	fifopath = xgetenv("NNN_FIFO", NULL);
 	if (fifopath) {
 		if (mkfifo(fifopath, 0600) != 0 && !(errno == EEXIST && access(fifopath, W_OK) == 0)) {
