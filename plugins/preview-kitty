@@ -27,7 +27,11 @@
 # Authors: Léo Villeveygoux
 
 preview_file () {
-    kill %% 2>/dev/null
+    if [ -n "$watch_file" ] && [ "$1" = "$prev_selection" ] ; then
+        return
+    fi
+
+    kill $(jobs -p) 2>/dev/null
     clear
     lines=$(($(tput lines)-1))
     cols=$(tput cols)
@@ -52,6 +56,9 @@ preview_file () {
         (bat --terminal-width="$cols" --paging=never --decorations=always \
             --color=always "$1" 2>/dev/null || cat) | head -n $lines &
     fi
+    if [ -n "$watch_file" ] ; then
+        inotifywait -qq -e modify "$1" && preview_file "$1" &
+    fi
 }
 
 if [ "$PREVIEW_MODE" ] ; then
@@ -61,10 +68,24 @@ if [ "$PREVIEW_MODE" ] ; then
         exit 1
     fi
 
+    if command -v inotifywait >/dev/null 2>&1 ; then
+        watch_file=1
+        cur_selection=$1
+    fi
+
     preview_file "$1"
 
     exec < "$NNN_FIFO"
     while read -r selection ; do
+        if [ -n "$watch_file" ] ; then
+            if [ "$selection" = "$cur_selection" ] ; then
+                continue
+            else
+                prev_selection=$cur_selection
+                cur_selection=$selection
+            fi
+        fi
+
         preview_file "$selection"
     done
     exit 0
