@@ -111,7 +111,24 @@ print_bin_info() {
 }
 
 preview_file () {
-    kill %- %+ 2>/dev/null && wait %- %+ 2>/dev/null
+    #kill %- %+ 2>/dev/null && wait %- %+ 2>/dev/null
+    if [ ! "$cat_pid" ] ; then
+        cat_pid=$(ps -o 'pid,comm' | awk '/cat/{print $1}')
+        subshell_pid=$(ps -o 'pid,comm') # avoid capturing PID of pipe's subshell
+        subshell_pid=$(echo "$subshell_pid" | awk '/sh/ && $1 != '$$' {print $1}')
+    fi
+
+    ps >> /tmp/pslog
+    ps -o pid >> /tmp/pslog
+
+    for pid in $(ps -o 'pid=') ; do
+        if [ "$pid" != $$ ] && [ "$pid" != "$cat_pid" ] && [ "$pid" != "$subshell_pid" ]; then
+
+            echo kill "$pid" "($$, $cat_pid, $subshell_pid)" >> /tmp/pslog
+            kill -s TERM "$pid" 2>>/tmp/pslog  && wait "$pid" 2>>/tmp/pslog
+        fi
+    done
+    
     clear
 
     # Trying to use pistol if it's available.
