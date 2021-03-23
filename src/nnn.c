@@ -7587,6 +7587,8 @@ static bool set_tmp_path(void)
 
 static void cleanup(void)
 {
+	printf("\033]2;\007"); /* reset terminal window title */
+	fflush(stdout);
 	free(selpath);
 	free(plgpath);
 	free(cfgpath);
